@@ -1,0 +1,432 @@
+\documentclass[twocolumn]{article}
+
+\title{Probabilistic Batch Mapping in Mixnets}
+
+\author{Aiswarya Walter, Student ID: 427199}
+
+\date{}
+
+%%packages
+\usepackage[margin=1.5cm,nohead]{geometry}
+\usepackage{graphicx}
+\usepackage{dblfloatfix} 
+\usepackage{amsmath}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float} 
+\algnewcommand\algorithmicforeach{\textbf{for each}}
+\algdef{S}[FOR]{ForEach}[1]{\algorithmicforeach\ #1\ \algorithmicdo}
+\usepackage{caption}  
+\usepackage{afterpage}
+% \usepackage{placeins}
+% \usepackage{flushend}
+% \usepackage{balance}
+
+% \setcounter{dbltopnumber}{2}
+% \renewcommand{\dbltopfraction}{0.9}
+% \renewcommand{\textfraction}{0.05}
+% \renewcommand{\dblfloatpagefraction}{0.8}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+% The abstract contains:
+% \begin{itemize}
+% \item Description and motivation of survey topic (2-3 sentences)
+% \item Summary of results and how they can help future research (2-3 sentences) 
+% \end{itemize}
+\end{abstract}
+
+
+\section{Introduction}
+
+% The introduction contains:
+% \begin{itemize}
+% \item motivate why field of research is important (e.g., if you work on incentives for payment channel networks,  motivate why blockchain and payment channels are important) 
+% \item state concrete topic you are working on and motivate why the topic is important for the field 
+% \item state your key contributions/findings
+% \item shortly state how these findings can guide future research (~1 sentence)
+% \end{itemize}
+% While you don't need to include citations in the abstract,  from here on all the claims you make require evidence,  which can be citations or your own reasoning. Computer Science typically uses the IEEE referencing style, which can easily be achieved within LaTeX~\cite{brosius1995instructions,gray2018producing}. 
+
+
+\section{Background and Related Work}
+\label{sec:bg}
+
+% \subsection{Mixnets in brief}
+% \subsection{Anonymity metrics and correlation models}
+% \subsection{Prior approaches related to batch inference}
+
+% Describe and assess the different papers in a meaningful order. For instance,  if there are k approaches,  have k sections.  You can also go from the most simple solution to the most sophisticated one.   The order depends on your papers and how they relate to each other, so there is no universal solution for deciding on the order. 
+
+\section{Problem Definition}
+\label{sec:problem}
+
+Mix networks (mixnets) aim to break the observable link between senders and receivers by reordering and delaying messages in batches. In an ideal mixnet, a global adversary observing all network traffic should not be able to determine which incoming batch of messages corresponds to which outgoing batch. However, temporal correlations and finite batch sizes can leak information about the mapping between incoming and outgoing batches.
+
+In this work, we investigate this batch-level correlation problem under a global adversary model. The adversary observes all incoming and outgoing messages along with their arrival and departure timestamps at the mix node, and attempts to infer which incoming batch most likely produced each outgoing batch.
+
+The research objective thus includes:
+
+\begin{enumerate}
+\item To develop an algorithm that efficiently enumerates all valid batch-level permutations under the above constraints; and
+
+\item To derive anonymity sets for each outgoing batch, enabling the evaluation of mixnet anonymity under varying operational parameters such as number of clients, batch size, and simulation duration.
+\end{enumerate}
+
+% \paragraph{Constraints.}
+% \begin{enumerate}
+%     \item \textbf{Timing:} For any $M_{kj}\in B_k$ mapped to $O_{pq}\in C_p$, enforce $t(M_{kj}) \le t(O_{pq})$ (with slack $\Delta$ if needed).
+%     \item \textbf{Batch-coherence:} Messages originating in $B_k$ must map to outputs within a single $C_p$.
+%     \item \textbf{Cardinality:} $|B_k|=|C_p|$ for matched pairs (or use padding/dummies to equalize).
+%     \item \textbf{Admissibility:} Optional route or layer constraints (e.g., impossible paths under topology or failure model).
+% \end{enumerate}
+
+\section{Proposed Solution: The Mixnet Batch Matching Algorithm}
+\label{sec:solution}
+
+% \subsection{Notation and data structures}
+% We maintain:
+% \begin{itemize}
+%     \item \texttt{ValidEdges}: allowed message pairs under timing/route constraints,
+%     \item \texttt{ValidPerms}: set of batch-consistent message permutations,
+%     \item \texttt{BatchProb}[p][k]: probability that $B_k$ maps to $C_p$,
+%     \item \texttt{BatchMappingCp}[p]: selected mapping realization (optional).
+% \end{itemize}
+
+\subsection{Mixim Batch Matching }
+
+Consider $n$ incoming batches of size $k$: $B_1, B_2,..B_n$ and $n$ outgoing batches of size $k$: $C_1, C_2,..C_n$.
+
+Let $M_{ij}$ denote the $j$th incoming message from batch $B_{i}$.
+
+Let $O_{ij}$ denote the $j$th outgoing message in batch $C_{i}$.
+
+\vspace{1em} 
+\begin{table*}[!t]
+\centering\small
+\begin{tabular}{l p{6cm} p{6cm}}
+\hline
+\textbf{Variables and Functions} & \textbf{Description} & \textbf{Data Type} \\
+\hline
+$M_{ij}$      & $j$-th message in the incoming batch $i$ & Message object\\
+$O_{pq}$      & $q$-th message in the outgoing batch $p$ & Message object\\
+$t_{M_{ij}}$  & Arrival time of message $M_{ij}$ & Timestamp  \\
+$t_{O_{pq}}$  & Sending time of message $O_{pq}$ & Timestamp  \\
+$IncomingBatches$ & Mapping of incoming batch ids to its messages & Dictionary of dictionaries \\
+$OutgoingBatches$ & Mapping of outgoing batch ids to its messages & Dictionary of dictionaries \\
+$OutBatchMappingCount$ & For each outgoing batch, it maps the candidate incoming batches to the number of valid permutations to that batch & Dictionary of dictionaries \\
+$OutMsgMappingSet$ & Set of valid input messages for each outgoing batch, $C_{p}$ & Dict of set of messages \\
+$Valids$      & List of valid message permutations for all outgoing batches & List of dict of lists  \\
+$BatchProb$ & Probability mapping for all output batches & Dict of dict \\
+$batchid(msg)$ & Returns the batch id of the message  & Function (returns integer) \\
+$msgid(msg)$   & Returns the message id  & Function (returns integer) \\
+$appendMsg(subpermutation, msg)$  & Operation to append a message to an existing sup-permutation of a batch  & Function (returns list) \\
+\hline
+\end{tabular}
+\caption{Variables and functions.} % (add a caption; helps placement)
+\end{table*}
+\vspace{1em} 
+
+\subsection{Algorithm: Mixim Batch Matching}
+\vspace{0.5em}
+
+% first page of the algorithm
+\begin{figure*}[p]
+  \captionsetup{type=algorithm}
+  \caption{Mixim Batch Matching}
+  \begin{algorithmic}[1]
+  \State $Valids \gets [] $
+\State $BatchProb \gets \{ \} $
+\State $ AnonymitySet \gets \{ \} $
+\State $ AnonymitySetSize \gets \{ \} $
+\State Outgoing message $O_{pq}$ enters the outgoing batch, $p$ at time $t_{O_{pq}}$
+\State $OutMsgMappingSet [p] \gets \{ \} $
+\ForEach{$ i \text{ in } IncomingBatches $}
+    \State $ lenIn \gets len(IncomingBatches[i]) $
+    \State $ lenOut \gets len(OutgoingBatches[p]) $
+    \If{$ lenIn \geq  lenOut $}
+        \State $OutBatchMappingCount[p][i] \gets 0 $
+    \EndIf
+\EndFor
+\ForEach{$ i \text{ in } OutBatchMappingCount[p] $}
+    \ForEach{$ M_{ij}, t_{M_{ij}} \text{ in } IncomingBatches[i] $}
+        \If{$ t_{M_{ij}} < t_{O_{pq}} $}
+            \State $ OutMsgMappingSet[O_{pq}].add(M_{ij}) $
+        \EndIf
+    \EndFor
+\EndFor
+\If{$Valids \gets [] $}
+    \ForEach{$M_{ij} \in OutMsgMappingSet[O_{pq}]$}
+        \State $Valids \gets Valids.append(\{ p: [M_{ij}] \} )$
+    \EndFor
+\Else
+    \State $tempValids \gets []$
+    \ForEach{$M_{ij} \in OutMsgMappingSet[O_{pq}]$}
+        \State $ i \gets batchid(M_{ij}) $
+        \State $ j \gets msgid(M_{ij}) $
+        \ForEach{$x \text{ in} Valids$}
+            \State $ newX \gets x $
+            \State $count \gets 0$
+            \State $ msgList \gets newX.get(p) $
+            \If {$ msgList $}
+                \For{$v \gets 0$ to $len(msgList)$}
+                    \State $ b \gets batchid(msgList[v]) $
+                    \State $ m \gets msgid(msgList[v]) $
+                    \If{$ b = i$ \textbf{and} $ m \neq j $}
+                        \State $count \gets count + 1$
+                    \Else
+                        \State \textbf{break}
+                    \EndIf
+                \EndFor
+                \If{$count \gets len(msgList)$}
+                    \State $ newMsgList \gets appendMsg( msgList,M_{ij})$
+                    \State $newX[p] \gets newMsgList $
+                    \State $tempValids \gets tempValids.append(newX)$
+                    \State $ OutBatchMappingCount[p][i] \gets OutBatchMappingCount[p][i] + 1$
+                    \State $count \gets 0$
+                \Else
+                    \State $count \gets 0$
+                \EndIf
+            \Else
+                \ForEach{$ batchMsgs \text{ in } x $}
+                    \If{$\text{batchid}(batchMsgs[0]) \neq i$}
+                        \State $count \gets count + 1$
+\algstore{mixim}
+  \end{algorithmic}
+\end{figure*}
+
+% second page (continued)
+\begin{figure*}[p]
+  \captionsetup{type=algorithm}
+  \ContinuedFloat
+  \caption{Mixim Batch Matching (continued)}
+  \begin{algorithmic}[1]
+  \algrestore{mixim}
+                      \EndIf
+                \EndFor
+                \If{$count \gets len(x) $}
+                    \State $newX [p] \gets  [M_{ij}] $
+                    \State $ tempValids \gets tempValids.append(newX) $
+                    \State $ OutBatchMappingCount[p][i] \gets OutBatchMappingCount[p][i] + 1 $
+                    \State $count \gets 0$
+                \Else
+                    \State $count \gets 0$
+                \EndIf
+            \EndIf
+        \EndFor
+    \EndFor
+    \State $ Valids \gets tempValids $
+    \State $ tempValids \gets [] $
+\EndIf
+
+\ForEach{$x \text{ in } Valids$}
+    \ForEach{$ outid \text{ in } x $}
+        \If{$ outid \neq p $}
+            \State $ inId \gets \text{batchid}(x[outid][0])$
+            \State $ OutBatchMappingCount[outid][inId] \gets OutBatchMappingCount[outid][inId] + 1$
+        \EndIf
+    \EndFor
+\EndFor
+\ForEach{$ outBatch \text{ in } OutBatchMappingCount $}
+    \If{$ outBatch  \text{ not in } BatchProb $}
+        \State $ BatchProb[outBatch] \gets \{ \} $
+    \EndIf
+    \State $ nonZero \gets \{ \} $
+    \ForEach{$(inBatch, count) \text{ in } OutBatchMappingCount[outBatch] $}
+        \State $ prob \gets \frac{count}{len(Valids)}$
+        \If{$ prob  > 0 $}
+            \State $ nonZero[inBatch] \gets prob $
+        \EndIf
+    \EndFor
+    \If{$ nonZero $}
+        \State $ BatchProb[outBatch] \gets nonZero $
+        \State $ AnonymitySet[outBatch] \gets \{ nonZero.keys() \} $
+        \State $ AnonymitySetSize[outBatch] \gets len(AnonymitySet[outBatch]) $
+    \Else
+        \If{$ outBatch \text{ in } BatchProb $}
+            \State $ del BatchProb[outBatch] $
+        \EndIf
+    \EndIf
+\EndFor
+\State $ OutBatchMappingCount \gets \{ \} $
+\State $ BatchProb \gets \{ \} $
+\State $ AnonymitySet \gets \{ \} $
+\State $ AnonymitySetSize \gets \{ \} $
+  \end{algorithmic}
+\end{figure*}
+
+% \begin{algorithmic}[1]
+% \State $Valids \gets [] $
+% \State $BatchProb \gets \{ \} $
+% \State $ AnonymitySet \gets \{ \} $
+% \State $ AnonymitySetSize \gets \{ \} $
+% \State Outgoing message $O_{pq}$ enters the outgoing batch, $p$ at time $t_{O_{pq}}$
+% \State $OutMsgMappingSet [p] \gets \{ \} $
+% \ForEach{$ i \text{ in } IncomingBatches $}
+%     \State $ lenIn \gets len(IncomingBatches[i]) $
+%     \State $ lenOut \gets len(OutgoingBatches[p]) $
+%     \If{$ lenIn \geq  lenOut $}
+%         \State $OutBatchMappingCount[p][i] \gets 0 $
+%     \EndIf
+% \EndFor
+% \ForEach{$ i \text{ in } OutBatchMappingCount[p] $}
+%     \ForEach{$ M_{ij}, t_{M_{ij}} \text{ in } IncomingBatches[i] $}
+%         \If{$ t_{M_{ij}} < t_{O_{pq}} $}
+%             \State $ OutMsgMappingSet[O_{pq}].add(M_{ij}) $
+%         \EndIf
+%     \EndFor
+% \EndFor
+% \If{$Valids \gets [] $}
+%     \ForEach{$M_{ij} \in OutMsgMappingSet[O_{pq}]$}
+%         \State $Valids \gets Valids.append(\{ p: [M_{ij}] \} )$
+%     \EndFor
+% \Else
+%     \State $tempValids \gets []$
+%     \ForEach{$M_{ij} \in OutMsgMappingSet[O_{pq}]$}
+%         \State $ i \gets batchid(M_{ij}) $
+%         \State $ j \gets msgid(M_{ij}) $
+%         \ForEach{$x \text{ in} Valids$}
+%             \State $ newX \gets x $
+%             \State $count \gets 0$
+%             \State $ msgList \gets newX.get(p) $
+%             \If {$ msgList $}
+%                 \For{$v \gets 0$ to $len(msgList)$}
+%                     \State $ b \gets batchid(msgList[v]) $
+%                     \State $ m \gets msgid(msgList[v]) $
+%                     \If{$ b = i$ \textbf{and} $ m \neq j $}
+%                         \State $count \gets count + 1$
+%                     \Else
+%                         \State \textbf{break}
+%                     \EndIf
+%                 \EndFor
+%                 \If{$count \gets len(msgList)$}
+%                     \State $ newMsgList \gets appendMsg( msgList,M_{ij})$
+%                     \State $newX[p] \gets newMsgList $
+%                     \State $tempValids \gets tempValids.append(newX)$
+%                     \State $ OutBatchMappingCount[p][i] \gets OutBatchMappingCount[p][i] + 1$
+%                     \State $count \gets 0$
+%                 \Else
+%                     \State $count \gets 0$
+%                 \EndIf
+%             \Else
+%                 \ForEach{$ batchMsgs \text{ in } x $}
+%                     \If{$\text{batchid}(batchMsgs[0]) \neq i$}
+%                         \State $count \gets count + 1$
+%                     \EndIf
+%                 \EndFor
+%                 \If{$count \gets len(x) $}
+%                     \State $newX [p] \gets  [M_{ij}] $
+%                     \State $ tempValids \gets tempValids.append(newX) $
+%                     \State $ OutBatchMappingCount[p][i] \gets OutBatchMappingCount[p][i] + 1 $
+%                     \State $count \gets 0$
+%                 \Else
+%                     \State $count \gets 0$
+%                 \EndIf
+%             \EndIf
+%         \EndFor
+%     \EndFor
+%     \State $ Valids \gets tempValids $
+%     \State $ tempValids \gets [] $
+% \EndIf
+
+% \ForEach{$x \text{ in } Valids$}
+%     \ForEach{$ outid \text{ in } x $}
+%         \If{$ outid \neq p $}
+%             \State $ inId \gets \text{batchid}(x[outid][0])$
+%             \State $ OutBatchMappingCount[outid][inId] \gets OutBatchMappingCount[outid][inId] + 1$
+%         \EndIf
+%     \EndFor
+% \EndFor
+% \ForEach{$ outBatch \text{ in } OutBatchMappingCount $}
+%     \If{$ outBatch  \text{ not in } BatchProb $}
+%         \State $ BatchProb[outBatch] \gets \{ \} $
+%     \EndIf
+%     \State $ nonZero \gets \{ \} $
+%     \ForEach{$(inBatch, count) \text{ in } OutBatchMappingCount[outBatch] $}
+%         \State $ prob \gets \frac{count}{len(Valids)}$
+%         \If{$ prob  > 0 $}
+%             \State $ nonZero[inBatch] \gets prob $
+%         \EndIf
+%     \EndFor
+%     \If{$ nonZero $}
+%         \State $ BatchProb[outBatch] \gets nonZero $
+%         \State $ AnonymitySet[outBatch] \gets \{ nonZero.keys() \} $
+%         \State $ AnonymitySetSize[outBatch] \gets len(AnonymitySet[outBatch]) $
+%     \Else
+%         \If{$ outBatch \text{ in } BatchProb $}
+%             \State $ del BatchProb[outBatch] $
+%         \EndIf
+%     \EndIf
+% \EndFor
+% \State $ OutBatchMappingCount \gets \{ \} $
+% \State $ BatchProb \gets \{ \} $
+% \State $ AnonymitySet \gets \{ \} $
+% \State $ AnonymitySetSize \gets \{ \} $
+% \end{algorithmic}
+% % \end{figure*}
+
+
+
+
+\subsection{Complexity}
+% \textbf{Baseline.} Enumerating all perfect matchings can be expensive; use bipartite matching with constraints (Hungarian/flow) per $(B_k,C_p)$, plus normalization across $p$.
+% \\
+% \textbf{Scaling.} Prune with timing windows, cap candidate edges, or approximate via sampling Monte Carlo over matchings.
+
+% \subsection{Link to anonymity metrics}
+% Batch-level probabilities can feed into entropy or min-entropy estimates and support risk analysis under partial compromise or timing leakage.
+
+\section{Experiments}
+
+\subsubsection{Experimental Setup}
+% Platform and code. Experiments were run on the RPTU cluster (Linux, Python 3.10). We used our Mixim Batch Matching implementation (commit/tag: <fill in>) that exports per-message timestamps and batch IDs, and a post-processing script that enumerates valid permutations under causal/timing constraints to derive anonymity sets for each outgoing batch.
+
+% Design choice (single-run per configuration). Enumerating constrained matchings scales poorly with batch size, which limits message throughput per run. To maximize coverage of parameter effects rather than spend compute on repeats with very small samples, we follow an illustrative case-study design: each configuration is executed once, and we compare trends across distinct settings.
+
+% Varied parameters (factor levels).
+
+% Number of clients: 10, 20, 30
+
+% Batch size: 3, 4, 5
+
+% Simulation duration: 12 hours, 24 hours
+
+% These factors were chosen because (i) more clients generally increase mixing opportunities, (ii) larger batch sizes increase permutation space (potentially enlarging anonymity sets), and (iii) longer durations yield more batches and more stable trends.
+
+\subsubsection{Evaluation Metrics}
+
+
+\subsubsection{Results and Observations}
+
+
+
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+% \textbf{Interpretation.} What high $\mathrm{BatchProb}$ implies for correlation risk; when probabilities become diffuse.
+% \\
+% \textbf{Limitations.} Assumption of batch-coherence; equal cardinality; independence across batches; computational cost for large batches.
+% \\
+% \textbf{Extensions.} Soft batch-coherence, cross-batch couplings, global assignment over all batches, and integration with reliability estimation.
+
+In the discussion section,  you elaborate on the fundamental differences between the papers you introduced. 
+Smaller aspects are discussed in the main sections.  In addition to the comparison,  you identify fundamental weaknesses and research gaps common to all approaches. 
+A discussion section is not always necessary, sometimes it is easier to have the discussion during the main sections and then highlight the key results and limitations in the conclusion.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+% We presented Mixim, a batch-consistent probabilistic matching method for mixnets.
+% It operationalizes constrained matchings to compute batch-to-batch probabilities, enabling deeper analysis of correlation risks and anonymity metrics. Future work includes large-scale evaluation and coupling with failure models.
+
+The conclusion states the lessons learned and then explains how the knowledge gained in the paper can lead to future improvements. It suggest avenues for future work. These avenues should be larger unsolved questions regarding the topic as a whole,  not small improvements needed for  individual projects (these can go into the main sections). 
+
+
+\bibliographystyle{plain}
+\bibliography{survey}
+
+\end{document}

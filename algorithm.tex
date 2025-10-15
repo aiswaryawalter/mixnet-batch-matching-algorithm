@@ -1,0 +1,228 @@
+\documentclass{article}
+
+% Language setting
+% Replace `english' with e.g. `spanish' to change the document language
+\usepackage[english]{babel}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{float} 
+\algnewcommand\algorithmicforeach{\textbf{for each}}
+\algdef{S}[FOR]{ForEach}[1]{\algorithmicforeach\ #1\ \algorithmicdo}
+
+\title{Batch Messages in Mixnets}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+
+\subsection{Mixim Batch Matching }
+
+Consider $n$ incoming batches of size $k$: $B_1, B_2,..B_n$ and $n$ outgoing batches of size $k$: $C_1, C_2,..C_n$.
+
+Let $M_{ij}$ denote the $j$th incoming message from batch $B_{i}$.
+
+Let $O_{ij}$ denote the $j$th outgoing message in batch $C_{i}$.
+
+\vspace{1em} 
+\begin{tabular}{l p{6cm} p{6cm}}
+\hline
+\textbf{Variables and Functions} & \textbf{Description} & \textbf{Data Type} \\
+\hline
+$M_{ij}$      & $j$-th message in the incoming batch $i$ & Message object\\
+$O_{pq}$      & $q$-th message in the outgoing batch $p$ & Message object\\
+$t_{M_{ij}}$  & Arrival time of message $M_{ij}$ & Timestamp  \\
+$t_{O_{pq}}$  & Sending time of message $O_{pq}$ & Timestamp  \\
+$IncomingBatches$ & Mapping of incoming batch ids to its messages & Dictionary of dictionaries \\
+$OutgoingBatches$ & Mapping of outgoing batch ids to its messages & Dictionary of dictionaries \\
+$OutBatchMappingCount$ & For each outgoing batch, it maps the candidate incoming batches to the number of valid permutations to that batch & Dictionary of dictionaries \\
+$OutMsgMappingSet$ & Set of valid input messages for each outgoing batch, $C_{p}$ & Dict of set of messages \\
+$Valids$      & List of valid message permutations for all outgoing batches & List of dict of lists  \\
+$BatchProb$ & Probability mapping for all output batches & Dict of dict \\
+$batchid(msg)$ & Returns the batch id of the message  & Function (returns integer) \\
+$msgid(msg)$   & Returns the message id  & Function (returns integer) \\
+$appendMsg(subpermutation, msg)$  & Operation to append a message to an existing sup-permutation of a batch  & Function (returns list) \\
+\hline
+\end{tabular}
+\vspace{1em} 
+
+\subsection{Algorithm: Mixim Batch Matching}
+\vspace{0.5em}
+
+\begin{algorithmic}[1]
+\State $Valids \gets [] $
+\State $BatchProb \gets \{ \} $
+\State $ AnonymitySet \gets \{ \} $
+\State $ AnonymitySetSize \gets \{ \} $
+\State Outgoing message $O_{pq}$ enters the outgoing batch, $p$ at time $t_{O_{pq}}$
+\State $OutMsgMappingSet [p] \gets \{ \} $
+\ForEach{$ i \text{ in } IncomingBatches $}
+    \State $ lenIn \gets len(IncomingBatches[i]) $
+    \State $ lenOut \gets len(OutgoingBatches[p]) $
+    \If{$ lenIn \geq  lenOut $}
+        \State $OutBatchMappingCount[p][i] \gets 0 $
+    \EndIf
+\EndFor
+\ForEach{$ i \text{ in } OutBatchMappingCount[p] $}
+    \ForEach{$ M_{ij}, t_{M_{ij}} \text{ in } IncomingBatches[i] $}
+        \If{$ t_{M_{ij}} < t_{O_{pq}} $}
+            \State $ OutMsgMappingSet[O_{pq}].add(M_{ij}) $
+        \EndIf
+    \EndFor
+\EndFor
+\If{$Valids \gets [] $}
+    \ForEach{$M_{ij} \in OutMsgMappingSet[O_{pq}]$}
+        \State $Valids \gets Valids.append(\{ p: [M_{ij}] \} )$
+    \EndFor
+\Else
+    \State $tempValids \gets []$
+    \ForEach{$M_{ij} \in OutMsgMappingSet[O_{pq}]$}
+        \State $ i \gets batchid(M_{ij}) $
+        \State $ j \gets msgid(M_{ij}) $
+        \ForEach{$x \text{ in} Valids$}
+            \State $ newX \gets x $
+            \State $count \gets 0$
+            \State $ msgList \gets newX.get(p) $
+            \If {$ msgList $}
+                \For{$v \gets 0$ to $len(msgList)$}
+                    \State $ b \gets batchid(msgList[v]) $
+                    \State $ m \gets msgid(msgList[v]) $
+                    \If{$ b = i$ \textbf{and} $ m \neq j $}
+                        \State $count \gets count + 1$
+                    \Else
+                        \State \textbf{break}
+                    \EndIf
+                \EndFor
+                \If{$count \gets len(msgList)$}
+                    \State $ newMsgList \gets appendMsg( msgList,M_{ij})$
+                    \State $newX[p] \gets newMsgList $
+                    \State $tempValids \gets tempValids.append(newX)$
+                    \State $ OutBatchMappingCount[p][i] \gets OutBatchMappingCount[p][i] + 1$
+                    \State $count \gets 0$
+                \Else
+                    \State $count \gets 0$
+                \EndIf
+            \Else
+                \ForEach{$ batchMsgs \text{ in} x $}
+                    \If{$\text{batchid}(batchMsgs[0]) \neq i$}
+                        \State $count \gets count + 1$
+                    \EndIf
+                \EndFor
+                \If{$count \gets len(x) $}
+                    \State $newX [p] \gets  [M_{ij}] $
+                    \State $ tempValids \gets tempValids.append(newX) $
+                    \State $ OutBatchMappingCount[p][i] \gets OutBatchMappingCount[p][i] + 1 $
+                    \State $count \gets 0$
+                \Else
+                    \State $count \gets 0$
+                \EndIf
+            \EndIf
+        \EndFor
+    \EndFor
+    \State $ Valids \gets tempValids $
+    \State $ tempValids \gets [] $
+\EndIf
+
+\ForEach{$x \text{ in } Valids$}
+    \ForEach{$ outid \text{ in } x $}
+        \If{$ outid \neq p $}
+            \State $ inId \gets \text{batchid}(x[outid][0])$
+            \State $ OutBatchMappingCount[outid][inId] \gets OutBatchMappingCount[outid][inId] + 1$
+        \EndIf
+    \EndFor
+\EndFor
+\ForEach{$ outBatch \text{ in } OutBatchMappingCount $}
+    \If{$ outBatch  \text{ not in } BatchProb $}
+        \State $ BatchProb[outBatch] \gets \{ \} $
+    \EndIf
+    \State $ nonZero \gets \{ \} $
+    \ForEach{$(inBatch, count) \text{ in } OutBatchMappingCount[outBatch] $}
+        \State $ prob \gets \frac{count}{len(Valids)}$
+        \If{$ prob  > 0 $}
+            \State $ nonZero[inBatch] \gets prob $
+        \EndIf
+    \EndFor
+    \If{$ nonZero $}
+        \State $ BatchProb[outBatch] \gets nonZero $
+        \State $ AnonymitySet[outBatch] \gets \{ nonZero.keys() \} $
+        \State $ AnonymitySetSize[outBatch] \gets len(AnonymitySet[outBatch]) $
+    \Else
+        \If{$ outBatch \text{ in } BatchProb $}
+            \State $ del BatchProb[outBatch] $
+        \EndIf
+    \EndIf
+\EndFor
+\State $ OutBatchMappingCount \gets \{ \} $
+\State $ BatchProb \gets \{ \} $
+\State $ AnonymitySet \gets \{ \} $
+\State $ AnonymitySetSize \gets \{ \} $
+\end{algorithmic}
+
+\subsection{Explanation of Mixim Batch Matching Algorithm}
+
+\subsubsection*{Objective}
+This algorithm constructs all valid mappings between incoming and outgoing batches in a mixnet and computes a full probability distribution ($BatchProb$) for each output batch.
+% This algorithm determines the most likely input batch ($B_i$) corresponding to each outgoing batch ($C_{p}$) in a mixnet, by comparing timestamps and constructing valid permutations.
+
+\subsubsection*{Inputs and Outputs}
+\begin{itemize}
+    \item \textbf{Input:} Outgoing message $O_{pq}$ entering batch $C_p$ at time $t_{O_{pq}}$.
+    \item \textbf{Output:} Updated probability estimates ${BatchProb[p][k]}$ for each candidate batch $B_k$.
+\end{itemize}
+
+\subsubsection*{Step-by-Step Explanation of Algorithm}
+
+The following describes each major stage of the Mixim Batch Matching algorithm, corresponding to the pseudocode steps.
+
+\paragraph{1. Initialize Candidate Sets.}
+The algorithm begins by initializing empty structures for valid permutations ($Valids = []$) and batch probabilities ($BatchProb = \{\}$) (Lines 1–2). When an outgoing message $O_{pq}$ enters the outgoing batch $C_p$, $BatchMappingC_p$ is initialised to an empty dictionary so that the count of valid permutations can be recalculated (Lines 3-4 ).
+It then determines which incoming batches are eligible to have contributed to the current outgoing batch $C_p$ (Lines 5–9). Specifically, for each incoming batch, if the number of messages is greater than or equal to the number of messages in the outgoing batch $C
+_p$, an entry is added to $BatchMappingC_p$ with an initial count of $0$.  
+Subsequently, all messages $M_{ij}$ that arrived before $O_{pq}$ and belong to a batch already present in $BatchMappingC_p$ are collected in $MsgMappingO_{pq}$ (Line 10).
+
+\paragraph{2. Construct Initial Valid Permutations.}
+If no valid permutations exist yet (i.e., $Valids = []$) (Line 11), each eligible message $M_{ij}$ from $MsgMappingO_{pq}$ is wrapped in its own single-message path and added to $Valids$ (Lines 12–14). This forms the initial set of valid permutations.
+
+\paragraph{3. Expand Valid Permutations.}
+If $Valids$ already contains existing permutations (Lines 15–55), the algorithm attempts to extend each path with the current message $M_{ij}$.  
+This is handled in two cases:  
+\begin{itemize}
+    \item \textbf{Existing sub-permutation for batch $p$:} If the current permutation already has a sub-permutation at index $p$ (Lines 20–37), the algorithm checks whether all messages in that sub-permutation originate from batch $B_i$ and are distinct from $M_{ij}$. If so, $M_{ij}$ is appended to that sub-permutation, and the updated permutation is added to $tempValids$. The corresponding entry in $BatchMappingC_p$ is incremented.
+    \item \textbf{No existing sub-permutation for batch $p$:} Otherwise (Lines 38–52), the algorithm verifies that batch $B_i$ is not already present in earlier sub-permutations. If valid, a new sub-permutation containing $M_{ij}$ is appended to the path, and the updated path is added to $tempValids$. The batch count in $BatchMappingC_p$ is incremented.
+\end{itemize}
+At the end of this step, $tempValids$ replaces $Valids$ (Line 56).
+
+% \paragraph{4. Compute Batch Probabilities for $C_p$.}
+% Using the updated $Valids$, the algorithm computes the probability of $O_{pq}$ originating from each candidate batch $B_k$ (Lines 55–57). This is done by normalizing each batch count in $BatchMappingC_p$ by the total number of valid permutations $|Valids|$.
+
+\paragraph{4. Update Batch Mappings for All Other Outgoing Batches.}
+For each valid path in $Valids$, the algorithm iterates through all output batches $r$ except the one corresponding to the current batch ($p-1$) (Lines 57–64).  
+For each such position, the incoming batch is identified using \texttt{batchid()}, and the corresponding count in $BatchMappingC_{r+1}$ is incremented.  
+This ensures that, in addition to updating counts for the current output batch $C_p$, the algorithm also maintains counts for all other outgoing batches in the permutation.
+
+\paragraph{5. Compute Batch Probabilities for All Outgoing Batches.}
+Finally, the algorithm computes normalized probabilities for every outgoing batch (Lines 65–69).  
+For each index $r$ (covering all batches in each valid paermutation) and each incoming $(batch, count)$ in $BatchMappingC_{r+1}$, the probability is calculated.
+
+
+% \subsection*{Notes}
+% \begin{itemize}
+%     \item The algorithm assumes that batch sizes and timestamps are already recorded.
+%     \item It progressively builds valid combinations of message permutations to support probabilistic matching.
+%     \item Edge cases like missing timestamps or inconsistent batch sizes are not explicitly handled.
+% \end{itemize}
+
+
+
+\end{document}
